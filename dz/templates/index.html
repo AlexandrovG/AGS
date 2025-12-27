@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калькулятор валют</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 500px;
+        }
+        h1 {
+            color: #1a2980;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 18px;
+            outline: none;
+        }
+        input:focus {
+            border-color: #1a2980;
+        }
+        select {
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            min-width: 120px;
+            outline: none;
+        }
+        .swap-btn {
+            background: #1a2980;
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            margin: 10px auto;
+            display: block;
+        }
+        .calc-btn {
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 25px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+        .result-amount {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a2980;
+            margin: 10px 0;
+        }
+        .rate-info {
+            color: #666;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 8px;
+            color: #2e7d32;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 Калькулятор валют</h1>
+        
+        <div class="input-group">
+            <input type="number" id="amount" value="100" min="0" step="0.01" placeholder="Сумма">
+            <select id="fromCurrency">
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="RUB">RUB</option>
+                <option value="GBP">GBP</option>
+                <option value="JPY">JPY</option>
+            </select>
+        </div>
+        
+        <button class="swap-btn" onclick="swapCurrencies()">⇅</button>
+        
+        <div class="input-group">
+            <div style="flex: 1; text-align: center; font-size: 24px;">→</div>
+            <select id="toCurrency">
+                <option value="RUB">RUB</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="JPY">JPY</option>
+            </select>
+        </div>
+        
+        <button class="calc-btn" onclick="calculate()">Рассчитать</button>
+        
+        <div class="result" id="resultBox" style="display: none;">
+            <div>Результат:</div>
+            <div class="result-amount" id="resultAmount">0</div>
+            <div class="rate-info">
+                1 <span id="rateFrom">USD</span> = <span id="rateValue">0</span> <span id="rateTo">EUR</span>
+            </div>
+        </div>
+        
+        <div class="status" id="status">
+            Загрузка курсов...
+        </div>
+    </div>
+
+    <script>
+        let rates = {};
+        
+        async function loadRates() {
+            try {
+                const base = document.getElementById('fromCurrency').value;
+                const response = await fetch(`/api/rates?base=${base}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    rates = data.rates;
+                    document.getElementById('status').textContent = 
+                        `Курсы обновлены • API: ${data.date || 'активен'}`;
+                    document.getElementById('status').style.background = '#e8f5e9';
+                    document.getElementById('status').style.color = '#2e7d32';
+                } else {
+                    throw new Error();
+                }
+            } catch {
+                rates = {};
+                document.getElementById('status').textContent = 
+                    'API временно недоступен • Используются кэшированные курсы';
+                document.getElementById('status').style.background = '#fff3e0';
+                document.getElementById('status').style.color = '#ef6c00';
+            }
+        }
+        
+        async function calculate() {
+            const amount = document.getElementById('amount').value;
+            const from = document.getElementById('fromCurrency').value;
+            const to = document.getElementById('toCurrency').value;
+            
+            if (!amount || amount <= 0) {
+                document.getElementById('resultBox').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(
+                    `/api/convert?from=${from}&to=${to}&amount=${amount}`
+                );
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('resultAmount').textContent = 
+                        `${data.result.toFixed(2)} ${to}`;
+                    document.getElementById('rateFrom').textContent = from;
+                    document.getElementById('rateTo').textContent = to;
+                    document.getElementById('rateValue').textContent = data.rate.toFixed(4);
+                    document.getElementById('resultBox').style.display = 'block';
+                }
+            } catch {
+                alert('Ошибка расчета');
+            }
+        }
+        
+        function swapCurrencies() {
+            const from = document.getElementById('fromCurrency');
+            const to = document.getElementById('toCurrency');
+            const temp = from.value;
+            from.value = to.value;
+            to.value = temp;
+            loadRates();
+            calculate();
+        }
+        
+        document.getElementById('amount').addEventListener('input', calculate);
+        document.getElementById('fromCurrency').addEventListener('change', function() {
+            loadRates();
+            calculate();
+        });
+        document.getElementById('toCurrency').addEventListener('change', calculate);
+        
+        loadRates();
+        calculate();
+    </script>
+</body>
+</html>
